@@ -1,0 +1,67 @@
+---
+title: "Practical Machine Learning Project"
+author: "Ben Guidarelli"
+date: "March 21, 2015"
+output: html_document
+---
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(caret)
+```
+
+The form that an athlete adheres to in sports or fitness activities is vital to their performance in that activity. With this in mind a group of scientists performed an exeriment to see if they could accurately and automatically determine whether or not an athlete was using proper form from a set of sensors.  The experiment was set up to demonstrate proper form for a dumbell curl as well as several common classes of mistakes and the sensors readings should be used to classify the atheletes activity performance (APC for Activity Performance Class from now on)
+
+The sensors were placed on the Upper Arm, Forarm, Hip Height, and on the dumbell itself. In their testing they were able to achieve between 74 and 86 percent accuracy in determining the correct APC. Our goal is to predict with similar accuracy the APC.
+
+```{r}
+ds <- read.csv("~/Downloads/pml-training.csv")
+```
+
+To begin we must determine how to use the data provided.  There are 160 variables in the initial data set including participant name, timestamps, window index, APC (as "classe"), as well as a number of raw sensor readings and derived values like kurtosis and skewness.  Rather than use PCA or another method to determine which variables to use we'll attempt to narrow down the list with a heuristic approach.  Since we dont care who was performing the activity and we don't need the derived values we can eliminate those right away.  Additionally values like "max_roll_xxx" are unhelpful in this exercise, so we eliminate those.
+
+We use the following function to pull out the columns that we really want (49 total)
+```{r}
+colsToUse <- grep('_x$|_y$|_z$|^yaw|^roll|^pitch|classe', colnames(ds))
+subset <- ds[,colsToUse]
+```
+
+Since there are over 19 thousand rows of data total, training would take a long time if we were to use the whole data set, so here we try with a sample of 500 at a time.  We'll demonstrate a few different algorithms on the same data to evaluate which to run the full training with. 
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(1234)
+
+smplIdx1 <- sample(1:19622, 500)
+smpl1 <- subset[smplIdx1,]
+
+smplIdx2 <- sample(1:19622, 500)
+smpl2 <- subset[smplIdx2,]
+
+knnTest<-train(classe~.,data=smpl1,method="knn",preProcess=c("center", "scale"))
+(sum(smpl2$classe == predict(knnTest, smpl2))/500)*100
+confusionMatrix(knnTest)
+
+rpartTest<-train(classe~.,data=smpl1,method="rpart")
+(sum(smpl2$classe == predict(rpartTest, smpl2))/500)*100
+confusionMatrix(rpartTest)
+
+randomForrestTest <- train(classe~.,data=smpl1,method="rf")
+(sum(smpl2$classe == predict(randomForrestTest, smpl2))/500)*100
+confusionMatrix(randomForrestTest)
+```
+
+We can see we got about 85% correct on this small test for Random Forrest which is on par with what the researchers got as well.  With our algorithm chosen we can train it on the full testing data set then run it against the test data set to find out how well it does classification.
+
+```{r, eval=FALSE}
+rfTesting <- train(classe~.,data=subset,method="rf")
+
+confusionMatrix(rfTesting)
+
+testds <- read.csv("~/Downloads/pml-testing.csv")
+prediction <- predict(rf, testds)
+(sum(testds$classe==prediction)/length(testds))*100
+```
+
+
+
+For more information please visit:
+http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf
