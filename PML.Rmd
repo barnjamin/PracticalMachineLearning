@@ -14,7 +14,8 @@ The form that an athlete adheres to in sports or fitness activities is vital to 
 The sensors were placed on the Upper Arm, Forarm, Hip Height, and on the dumbell itself. In their testing they were able to achieve between 74 and 86 percent accuracy in determining the correct APC. Our goal is to predict with similar accuracy the APC.
 
 ```{r}
-ds <- read.csv("~/Downloads/pml-training.csv")
+ds <- read.csv("pml-training.csv")
+ts <- read.csv("pml-testing.csv")
 ```
 
 To begin we must determine how to use the data provided.  There are 160 variables in the initial data set including participant name, timestamps, window index, APC (as "classe"), as well as a number of raw sensor readings and derived values like kurtosis and skewness.  Rather than use PCA or another method to determine which variables to use we'll attempt to narrow down the list with a heuristic approach.  Since we dont care who was performing the activity and we don't need the derived values we can eliminate those right away.  Additionally values like "max_roll_xxx" are unhelpful in this exercise, so we eliminate those.
@@ -23,9 +24,10 @@ We use the following function to pull out the columns that we really want (49 to
 ```{r}
 colsToUse <- grep('_x$|_y$|_z$|^yaw|^roll|^pitch|classe', colnames(ds))
 subset <- ds[,colsToUse]
+testSubset <- ts[,colsToUse]
 ```
 
-Since there are over 19 thousand rows of data total, training would take a long time if we were to use the whole data set, so here we try with a sample of 500 at a time.  We'll demonstrate a few different algorithms on the same data to evaluate which to run the full training with. 
+Since there are over 19 thousand rows of data total, training would take a long time if we were to use the whole data set, so here we try with a cross validation sample of 500 for both the training and the test sets to give us a rough estimate of the error rates with different models.  We'll demonstrate a few different algorithms on the same data to evaluate which to run the full training with. 
 
 ```{r, warning=FALSE, message=FALSE}
 set.seed(1234)
@@ -44,22 +46,21 @@ rpartTest<-train(classe~.,data=smpl1,method="rpart")
 (sum(smpl2$classe == predict(rpartTest, smpl2))/500)*100
 confusionMatrix(rpartTest)
 
-randomForrestTest <- train(classe~.,data=smpl1,method="rf")
-(sum(smpl2$classe == predict(randomForrestTest, smpl2))/500)*100
-confusionMatrix(randomForrestTest)
+randomForestTest <- train(classe~.,data=smpl1,method="rf")
+(sum(smpl2$classe == predict(randomForestTest, smpl2))/500)*100
+confusionMatrix(randomForestTest)
 ```
 
-We can see we got about 85% correct on this small test for Random Forrest which is on par with what the researchers got as well.  With our algorithm chosen we can train it on the full testing data set then run it against the test data set to find out how well it does classification.
+We can see we got about 85% correct on this small test for Random Forest which is on par with what the researchers got as well.  With our algorithm chosen we can train it on the full testing data set then run it against the test data set to find out how well it does classification.  Hopefully we can improve that number with a more comprehensive view of the data.
 
 ```{r, eval=FALSE}
+library(randomForest)
 rfTesting <- train(classe~.,data=subset,method="rf")
 
-confusionMatrix(rfTesting)
-
-testds <- read.csv("~/Downloads/pml-testing.csv")
-prediction <- predict(rf, testds)
-(sum(testds$classe==prediction)/length(testds))*100
+prediction <- predict(rfTesting, testSubset)
 ```
+
+In practice, I ran the above training function with ntrees=10 and it finished in just a few minutes.  This was still sufficient to get excellent predictions and achieved 100% classification accuracy with the test set.
 
 
 
